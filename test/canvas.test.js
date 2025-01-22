@@ -14,11 +14,15 @@ const {
   createCanvas,
   createImageData,
   loadImage,
-  parseFont,
   registerFont,
   Canvas,
   deregisterAllFonts
 } = require('../')
+
+function assertApprox(actual, expected, tol) {
+  assert(Math.abs(expected - actual) <= tol,
+    "Expected " + actual + " to be " + expected + " +/- " + tol);
+}
 
 describe('Canvas', function () {
   // Run with --expose-gc and uncomment this line to help find memory problems:
@@ -26,80 +30,10 @@ describe('Canvas', function () {
 
   it('Prototype and ctor are well-shaped, don\'t hit asserts on accessors (GH-803)', function () {
     const c = new Canvas(10, 10)
-    assert.throws(function () { Canvas.prototype.width }, /incompatible receiver/)
+    assert.throws(function () { Canvas.prototype.width }, /invalid argument/i)
     assert(!c.hasOwnProperty('width'))
     assert('width' in c)
     assert('width' in Canvas.prototype)
-  })
-
-  it('.parseFont()', function () {
-    const tests = [
-      '20px Arial',
-      { size: 20, unit: 'px', family: 'Arial' },
-      '20pt Arial',
-      { size: 26.666666666666668, unit: 'pt', family: 'Arial' },
-      '20.5pt Arial',
-      { size: 27.333333333333332, unit: 'pt', family: 'Arial' },
-      '20% Arial',
-      { size: 20, unit: '%', family: 'Arial' }, // TODO I think this is a bad assertion - ZB 23-Jul-2017
-      '20mm Arial',
-      { size: 75.59055118110237, unit: 'mm', family: 'Arial' },
-      '20px serif',
-      { size: 20, unit: 'px', family: 'serif' },
-      '20px sans-serif',
-      { size: 20, unit: 'px', family: 'sans-serif' },
-      '20px monospace',
-      { size: 20, unit: 'px', family: 'monospace' },
-      '50px Arial, sans-serif',
-      { size: 50, unit: 'px', family: 'Arial,sans-serif' },
-      'bold italic 50px Arial, sans-serif',
-      { style: 'italic', weight: 'bold', size: 50, unit: 'px', family: 'Arial,sans-serif' },
-      '50px Helvetica ,  Arial, sans-serif',
-      { size: 50, unit: 'px', family: 'Helvetica,Arial,sans-serif' },
-      '50px "Helvetica Neue", sans-serif',
-      { size: 50, unit: 'px', family: 'Helvetica Neue,sans-serif' },
-      '50px "Helvetica Neue", "foo bar baz" , sans-serif',
-      { size: 50, unit: 'px', family: 'Helvetica Neue,foo bar baz,sans-serif' },
-      "50px 'Helvetica Neue'",
-      { size: 50, unit: 'px', family: 'Helvetica Neue' },
-      'italic 20px Arial',
-      { size: 20, unit: 'px', style: 'italic', family: 'Arial' },
-      'oblique 20px Arial',
-      { size: 20, unit: 'px', style: 'oblique', family: 'Arial' },
-      'normal 20px Arial',
-      { size: 20, unit: 'px', style: 'normal', family: 'Arial' },
-      '300 20px Arial',
-      { size: 20, unit: 'px', weight: '300', family: 'Arial' },
-      '800 20px Arial',
-      { size: 20, unit: 'px', weight: '800', family: 'Arial' },
-      'bolder 20px Arial',
-      { size: 20, unit: 'px', weight: 'bolder', family: 'Arial' },
-      'lighter 20px Arial',
-      { size: 20, unit: 'px', weight: 'lighter', family: 'Arial' },
-      'normal normal normal 16px Impact',
-      { size: 16, unit: 'px', weight: 'normal', family: 'Impact', style: 'normal', variant: 'normal' },
-      'italic small-caps bolder 16px cursive',
-      { size: 16, unit: 'px', style: 'italic', variant: 'small-caps', weight: 'bolder', family: 'cursive' },
-      '20px "new century schoolbook", serif',
-      { size: 20, unit: 'px', family: 'new century schoolbook,serif' },
-      '20px "Arial bold 300"', // synthetic case with weight keyword inside family
-      { size: 20, unit: 'px', family: 'Arial bold 300', variant: 'normal' }
-    ]
-
-    for (let i = 0, len = tests.length; i < len; ++i) {
-      const str = tests[i++]
-      const expected = tests[i]
-      const actual = parseFont(str)
-
-      if (!expected.style) expected.style = 'normal'
-      if (!expected.weight) expected.weight = 'normal'
-      if (!expected.stretch) expected.stretch = 'normal'
-      if (!expected.variant) expected.variant = 'normal'
-
-      assert.deepEqual(actual, expected, 'Failed to parse: ' + str)
-    }
-
-    assert.strictEqual(parseFont('Helvetica, sans'), undefined)
   })
 
   it('registerFont', function () {
@@ -158,6 +92,13 @@ describe('Canvas', function () {
     ctx.fillStyle = '#FGG'
     assert.equal('#ff0000', ctx.fillStyle)
 
+    ctx.fillStyle = '      #FCA'
+    assert.equal('#ffccaa', ctx.fillStyle)
+
+    ctx.fillStyle = '         #ffccaa'
+    assert.equal('#ffccaa', ctx.fillStyle)
+
+
     ctx.fillStyle = '#fff'
     ctx.fillStyle = 'afasdfasdf'
     assert.equal('#ffffff', ctx.fillStyle)
@@ -202,6 +143,95 @@ describe('Canvas', function () {
     ctx.fillStyle = 'rgba(0, 0, 0, 42.42)'
     assert.equal('#000000', ctx.fillStyle)
 
+    ctx.fillStyle = 'rgba(255, 250, 255)';
+    assert.equal('#fffaff', ctx.fillStyle);
+
+    ctx.fillStyle = 'rgba(124, 58, 26, 0)';
+    assert.equal('rgba(124, 58, 26, 0.00)', ctx.fillStyle);
+
+    ctx.fillStyle = 'rgba( 255, 200, 90, 40%)'
+    assert.equal('rgba(255, 200, 90, 0.40)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255, 200, 90, 50 %)'
+    assert.equal('rgba(255, 200, 90, 0.50)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255, 200, 90, 10%)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255, 200, 90, 10 %)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255, 200, 90 / 40%)'
+    assert.equal('rgba(255, 200, 90, 0.40)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255, 200, 90 / 0.5)'
+    assert.equal('rgba(255, 200, 90, 0.50)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255, 200, 90 / 10%)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255, 200, 90 / 0.1)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255 200 90 / 10%)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgba( 255 200 90  0.1)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb(0, 0, 0, 42.42)'
+    assert.equal('#000000', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb(255, 250, 255)';
+    assert.equal('#fffaff', ctx.fillStyle);
+
+    ctx.fillStyle = 'rgb(124, 58, 26, 0)';
+    assert.equal('rgba(124, 58, 26, 0.00)', ctx.fillStyle);
+
+    ctx.fillStyle = 'rgb( 255, 200, 90, 40%)'
+    assert.equal('rgba(255, 200, 90, 0.40)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255, 200, 90, 50 %)'
+    assert.equal('rgba(255, 200, 90, 0.50)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255, 200, 90, 10%)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255, 200, 90, 10 %)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255, 200, 90 / 40%)'
+    assert.equal('rgba(255, 200, 90, 0.40)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255, 200, 90 / 0.5)'
+    assert.equal('rgba(255, 200, 90, 0.50)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255, 200, 90 / 10%)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255, 200, 90 / 0.1)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255 200 90 / 10%)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255 200 90  0.1)'
+    assert.equal('rgba(255, 200, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = '       rgb( 255 100 90  0.1)'
+    assert.equal('rgba(255, 100, 90, 0.10)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb(124.00, 58, 26, 0)';
+    assert.equal('rgba(124, 58, 26, 0.00)', ctx.fillStyle);
+
+    ctx.fillStyle = 'rgb( 255, 200.09, 90, 40%)'
+    assert.equal('rgba(255, 201, 90, 0.40)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255.00, 199.03, 90, 50 %)'
+    assert.equal('rgba(255, 200, 90, 0.50)', ctx.fillStyle)
+
+    ctx.fillStyle = 'rgb( 255, 300.09, 90, 40%)'
+    assert.equal('rgba(255, 255, 90, 0.40)', ctx.fillStyle)
     // hsl / hsla tests
 
     ctx.fillStyle = 'hsl(0, 0%, 0%)'
@@ -224,6 +254,9 @@ describe('Canvas', function () {
 
     ctx.fillStyle = 'hsl(237, 76%, 25%)'
     assert.equal('#0f1470', ctx.fillStyle)
+
+    ctx.fillStyle = '      hsl(0, 150%, 150%)'
+    assert.equal('#ffffff', ctx.fillStyle)
 
     ctx.fillStyle = 'hsl(240, 73%, 25%)'
     assert.equal('#11116e', ctx.fillStyle)
@@ -586,6 +619,11 @@ describe('Canvas', function () {
       assert.equal('PNG', buf.slice(1, 4).toString())
     })
 
+    it('Canvas#toBuffer("image/png", {filters: PNG_ALL_FILTERS})', function () {
+      const buf = createCanvas(200, 200).toBuffer('image/png', { filters: Canvas.PNG_ALL_FILTERS })
+      assert.equal('PNG', buf.slice(1, 4).toString())
+    })
+
     it('Canvas#toBuffer("image/jpeg")', function () {
       const buf = createCanvas(200, 200).toBuffer('image/jpeg')
       assert.equal(buf[0], 0xff)
@@ -714,6 +752,11 @@ describe('Canvas', function () {
         canvas.toBuffer('raw') // (side-effect: flushes canvas)
         assertPixel(0xffff0000, 5, 0, 'first red pixel')
       })
+    })
+
+    it('Canvas#toBuffer("application/pdf")', function () {
+      const buf = createCanvas(200, 200, 'pdf').toBuffer('application/pdf')
+      assert.equal('PDF', buf.slice(1, 4).toString())
     })
   })
 
@@ -943,19 +986,45 @@ describe('Canvas', function () {
       let metrics = ctx.measureText('Alphabet')
       // Actual value depends on font library version. Have observed values
       // between 0 and 0.769.
-      assert.ok(metrics.alphabeticBaseline >= 0 && metrics.alphabeticBaseline <= 1)
+      assertApprox(metrics.alphabeticBaseline, 0.5, 0.5)
       // Positive = going up from the baseline
       assert.ok(metrics.actualBoundingBoxAscent > 0)
       // Positive = going down from the baseline
-      assert.ok(metrics.actualBoundingBoxDescent > 0) // ~4-5
+      assertApprox(metrics.actualBoundingBoxDescent, 5, 2)
 
       ctx.textBaseline = 'bottom'
       metrics = ctx.measureText('Alphabet')
       assert.strictEqual(ctx.textBaseline, 'bottom')
-      assert.ok(metrics.alphabeticBaseline > 0) // ~4-5
+      assertApprox(metrics.alphabeticBaseline, 5, 2)
       assert.ok(metrics.actualBoundingBoxAscent > 0)
       // On the baseline or slightly above
       assert.ok(metrics.actualBoundingBoxDescent <= 0)
+    })
+
+    it('actualBoundingBox is correct for left, center and right alignment (#1909)', function () {
+      const canvas = createCanvas(0, 0)
+      const ctx = canvas.getContext('2d')
+
+      // positive actualBoundingBoxLeft indicates a distance going left from the
+      // given alignment point.
+
+      // positive actualBoundingBoxRight indicates a distance going right from
+      // the given alignment point.
+
+      ctx.textAlign = 'left'
+      const lm = ctx.measureText('aaaa')
+      assertApprox(lm.actualBoundingBoxLeft, -1, 6)
+      assertApprox(lm.actualBoundingBoxRight, 21, 6)
+
+      ctx.textAlign = 'center'
+      const cm = ctx.measureText('aaaa')
+      assertApprox(cm.actualBoundingBoxLeft, 9, 6)
+      assertApprox(cm.actualBoundingBoxRight, 11, 6)
+
+      ctx.textAlign = 'right'
+      const rm = ctx.measureText('aaaa')
+      assertApprox(rm.actualBoundingBoxLeft, 19, 6)
+      assertApprox(rm.actualBoundingBoxRight, 1, 6)
     })
   })
 
@@ -1180,6 +1249,430 @@ describe('Canvas', function () {
 
     it('works, slice, RGB30')
 
+    describe('slice partially outside the canvas', function () {
+      describe('left', function () {
+        if('works, RGBA32', function () {
+          const ctx = createTestCanvas()
+          const imageData = ctx.getImageData(-1, 0, 2, 1)
+          assert.equal(2, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(0, imageData.data[3])
+
+          assert.equal(255, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(255, imageData.data[7])
+        })
+
+        it('works, RGB24', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB24' })
+          const imageData = ctx.getImageData(-1, 0, 2, 1)
+          assert.equal(2, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(0, imageData.data[3])
+
+          assert.equal(255, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(255, imageData.data[7])
+        })
+
+        it('works, RGB16_565', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB16_565' })
+          const imageData = ctx.getImageData(-1, 0, 2, 1)
+          assert.equal(2, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(2, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal((255 & 0b11111) << 11, imageData.data[1])
+        })
+
+        it('works, A8', function () {
+          const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+          const imageData = ctx.getImageData(-1, 0, 2, 1)
+          assert.equal(2, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(2, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(63, imageData.data[1])
+        })
+      })
+
+      describe('right', function () {
+        it('works, RGBA32', function () {
+          const ctx = createTestCanvas()
+          const imageData = ctx.getImageData(2, 0, 2, 1)
+          assert.equal(2, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(255, imageData.data[2])
+          assert.equal(255, imageData.data[3])
+
+          assert.equal(0, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(0, imageData.data[7])
+        })
+
+        it('works, RGB24', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB24' })
+          const imageData = ctx.getImageData(2, 0, 2, 1)
+          assert.equal(2, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(255, imageData.data[2])
+          assert.equal(255, imageData.data[3])
+
+          assert.equal(0, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(0, imageData.data[7])
+        })
+
+        it('works, RGB16_565', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB16_565' })
+          const imageData = ctx.getImageData(2, 0, 2, 1)
+          assert.equal(2, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(2, imageData.data.length)
+
+          assert.equal((255 & 0b11111), imageData.data[0])
+          assert.equal(0, imageData.data[1])
+        })
+
+        it('works, A8', function () {
+          const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+          const imageData = ctx.getImageData(2, 0, 2, 1)
+          assert.equal(2, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(2, imageData.data.length)
+
+          assert.equal(191, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+        })
+      })
+
+      describe('left and right', function () {
+        it('works, RGBA32', function () {
+          const ctx = createTestCanvas()
+          const imageData = ctx.getImageData(-1, 0, 5, 1)
+          assert.equal(5, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(20, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(0, imageData.data[3])
+
+          assert.equal(255, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(255, imageData.data[7])
+
+          assert.equal(0, imageData.data[8])
+          assert.equal(255, imageData.data[9])
+          assert.equal(0, imageData.data[10])
+          assert.equal(255, imageData.data[11])
+
+          assert.equal(0, imageData.data[12])
+          assert.equal(0, imageData.data[13])
+          assert.equal(255, imageData.data[14])
+          assert.equal(255, imageData.data[15])
+
+          assert.equal(0, imageData.data[16])
+          assert.equal(0, imageData.data[17])
+          assert.equal(0, imageData.data[18])
+          assert.equal(0, imageData.data[19])
+        })
+
+        it('works, RGB24', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB24' })
+          const imageData = ctx.getImageData(-1, 0, 5, 1)
+          assert.equal(5, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(20, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(0, imageData.data[3])
+
+          assert.equal(255, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(255, imageData.data[7])
+
+          assert.equal(0, imageData.data[8])
+          assert.equal(255, imageData.data[9])
+          assert.equal(0, imageData.data[10])
+          assert.equal(255, imageData.data[11])
+
+          assert.equal(0, imageData.data[12])
+          assert.equal(0, imageData.data[13])
+          assert.equal(255, imageData.data[14])
+          assert.equal(255, imageData.data[15])
+
+          assert.equal(0, imageData.data[16])
+          assert.equal(0, imageData.data[17])
+          assert.equal(0, imageData.data[18])
+          assert.equal(0, imageData.data[19])
+        })
+
+        it('works, RGB16_565', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB16_565' })
+          const imageData = ctx.getImageData(-1, 0, 5, 1)
+          assert.equal(5, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(5, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+
+          assert.equal((255 & 0b11111) << 11, imageData.data[1])
+          assert.equal((255 & 0b111111) << 5, imageData.data[2])
+          assert.equal((255 & 0b11111), imageData.data[3])
+
+          assert.equal(0, imageData.data[4])
+        })
+
+        it('works, A8', function () {
+          const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+          const imageData = ctx.getImageData(-1, 0, 5, 1)
+          assert.equal(5, imageData.width)
+          assert.equal(1, imageData.height)
+          assert.equal(5, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(63, imageData.data[1])
+          assert.equal(127, imageData.data[2])
+          assert.equal(191, imageData.data[3])
+          assert.equal(0, imageData.data[4])
+        })
+      })
+
+      describe('top', function () {
+        it('works, RGBA32', function () {
+          const ctx = createTestCanvas()
+          const imageData = ctx.getImageData(0, -1, 1, 2)
+          assert.equal(1, imageData.width)
+          assert.equal(2, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(0, imageData.data[3])
+
+          assert.equal(255, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(255, imageData.data[7])
+        })
+
+        it('works, RGB24', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB24' })
+          const imageData = ctx.getImageData(0, -1, 1, 2)
+          assert.equal(1, imageData.width)
+          assert.equal(2, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(0, imageData.data[3])
+
+          assert.equal(255, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(255, imageData.data[7])
+        })
+
+        it('works, RGB16_565', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB16_565' })
+          const imageData = ctx.getImageData(0, -1, 1, 2)
+          assert.equal(1, imageData.width)
+          assert.equal(2, imageData.height)
+          assert.equal(2, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal((255 & 0b11111) << 11, imageData.data[1])
+        })
+
+        it('works, A8', function () {
+          const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+          const imageData = ctx.getImageData(0, -1, 1, 2)
+          assert.equal(1, imageData.width)
+          assert.equal(2, imageData.height)
+          assert.equal(2, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(63, imageData.data[1])
+        })
+      })
+
+      describe('bottom', function () {
+        it('works, RGBA32', function () {
+          const ctx = createTestCanvas()
+          const imageData = ctx.getImageData(0, 5, 1, 2)
+          assert.equal(1, imageData.width)
+          assert.equal(2, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(255, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(255, imageData.data[3])
+
+          assert.equal(0, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(0, imageData.data[7])
+        })
+
+        it('works, RGB24', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB24' })
+          const imageData = ctx.getImageData(0, 5, 1, 2)
+          assert.equal(1, imageData.width)
+          assert.equal(2, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(255, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(255, imageData.data[3])
+
+          assert.equal(0, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(0, imageData.data[7])
+        })
+
+        it('works, RGB16_565', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB16_565' })
+          const imageData = ctx.getImageData(0, 5, 1, 2)
+          assert.equal(1, imageData.width)
+          assert.equal(2, imageData.height)
+          assert.equal(2, imageData.data.length)
+
+          assert.equal((255 & 0b11111) << 11, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+        })
+
+        it('works, A8', function () {
+          const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+          const imageData = ctx.getImageData(0, 5, 1, 2)
+          assert.equal(1, imageData.width)
+          assert.equal(2, imageData.height)
+          assert.equal(2, imageData.data.length)
+
+          assert.equal(63, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+        })
+      })
+
+      describe('top to bottom', function () {
+        it('works, RGBA32', function () {
+          const ctx = createTestCanvas()
+          const imageData = ctx.getImageData(0, -1, 1, 8)
+          assert.equal(1, imageData.width)
+          assert.equal(8, imageData.height)
+          assert.equal(32, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(0, imageData.data[3])
+
+          assert.equal(255, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(255, imageData.data[7])
+
+          assert.equal(255, imageData.data[24])
+          assert.equal(0, imageData.data[25])
+          assert.equal(0, imageData.data[26])
+          assert.equal(255, imageData.data[27])
+
+          assert.equal(0, imageData.data[28])
+          assert.equal(0, imageData.data[29])
+          assert.equal(0, imageData.data[30])
+          assert.equal(0, imageData.data[31])
+        })
+
+        it('works, RGB24', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB24' })
+          const imageData = ctx.getImageData(0, -1, 1, 8)
+          assert.equal(1, imageData.width)
+          assert.equal(8, imageData.height)
+          assert.equal(32, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(0, imageData.data[1])
+          assert.equal(0, imageData.data[2])
+          assert.equal(0, imageData.data[3])
+
+          assert.equal(255, imageData.data[4])
+          assert.equal(0, imageData.data[5])
+          assert.equal(0, imageData.data[6])
+          assert.equal(255, imageData.data[7])
+
+          assert.equal(255, imageData.data[24])
+          assert.equal(0, imageData.data[25])
+          assert.equal(0, imageData.data[26])
+          assert.equal(255, imageData.data[27])
+
+          assert.equal(0, imageData.data[28])
+          assert.equal(0, imageData.data[29])
+          assert.equal(0, imageData.data[30])
+          assert.equal(0, imageData.data[31])
+        })
+
+        it('works, RGB16_565', function () {
+          const ctx = createTestCanvas(false, { pixelFormat: 'RGB16_565' })
+          const imageData = ctx.getImageData(0, -1, 1, 8)
+          assert.equal(1, imageData.width)
+          assert.equal(8, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal((255 & 0b11111) << 11, imageData.data[1])
+          assert.equal((255 & 0b11111) << 11, imageData.data[6])
+          assert.equal(0, imageData.data[7])
+        })
+
+        it('works, A8', function () {
+          const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+          const imageData = ctx.getImageData(0, -1, 1, 8)
+          assert.equal(1, imageData.width)
+          assert.equal(8, imageData.height)
+          assert.equal(8, imageData.data.length)
+
+          assert.equal(0, imageData.data[0])
+          assert.equal(63, imageData.data[1])
+          assert.equal(63, imageData.data[6])
+          assert.equal(0, imageData.data[7])
+        })
+      })
+    })
+
     it('works, assignment', function () {
       const ctx = createTestCanvas()
       const data = ctx.getImageData(0, 0, 5, 5).data
@@ -1201,6 +1694,60 @@ describe('Canvas', function () {
       const ctx = canvas.getContext('2d')
       assert.throws(() => {
         ctx.getImageData(0, 0, 3, 6)
+      })
+    })
+
+    describe('does not throw if rectangle is outside the canvas (#2024)', function () {
+      it('on the left', function () {
+        const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+
+        const imageData = ctx.getImageData(-11, 0, 2, 2);
+        assert.equal(2, imageData.width)
+        assert.equal(2, imageData.height)
+        assert.equal(4, imageData.data.length)
+        assert.equal(0, imageData.data[0])
+        assert.equal(0, imageData.data[1])
+        assert.equal(0, imageData.data[2])
+        assert.equal(0, imageData.data[3])
+      })
+
+      it('on the right', function () {
+        const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+
+        const imageData = ctx.getImageData(98, 0, 2, 2);
+        assert.equal(2, imageData.width)
+        assert.equal(2, imageData.height)
+        assert.equal(4, imageData.data.length)
+        assert.equal(0, imageData.data[0])
+        assert.equal(0, imageData.data[1])
+        assert.equal(0, imageData.data[2])
+        assert.equal(0, imageData.data[3])
+      })
+
+      it('on the top', function () {
+        const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+
+        const imageData = ctx.getImageData(0, -12, 2, 2);
+        assert.equal(2, imageData.width)
+        assert.equal(2, imageData.height)
+        assert.equal(4, imageData.data.length)
+        assert.equal(0, imageData.data[0])
+        assert.equal(0, imageData.data[1])
+        assert.equal(0, imageData.data[2])
+        assert.equal(0, imageData.data[3])
+      })
+
+      it('on the bottom', function () {
+        const ctx = createTestCanvas(true, { pixelFormat: 'A8' })
+
+        const imageData = ctx.getImageData(0, 98, 2, 2);
+        assert.equal(2, imageData.width)
+        assert.equal(2, imageData.height)
+        assert.equal(4, imageData.data.length)
+        assert.equal(0, imageData.data[0])
+        assert.equal(0, imageData.data[1])
+        assert.equal(0, imageData.data[2])
+        assert.equal(0, imageData.data[3])
       })
     })
   })
@@ -1371,6 +1918,14 @@ describe('Canvas', function () {
     assert.strictEqual(pattern.toString(), '[object CanvasPattern]')
   })
 
+  it('CanvasPattern has class string of `CanvasPattern`', async function () {
+    const img = await loadImage(path.join(__dirname, '/fixtures/checkers.png'));
+    const canvas = createCanvas(20, 20)
+    const ctx = canvas.getContext('2d')
+    const pattern = ctx.createPattern(img)
+    assert.strictEqual(Object.prototype.toString.call(pattern), '[object CanvasPattern]')
+  })
+
   it('Context2d#createLinearGradient()', function () {
     const canvas = createCanvas(20, 1)
     const ctx = canvas.getContext('2d')
@@ -1400,12 +1955,24 @@ describe('Canvas', function () {
     assert.equal(0, imageData.data[i + 2])
     assert.equal(255, imageData.data[i + 3])
   })
+  it('Canvas has class string of `HTMLCanvasElement`', function () {
+    const canvas = createCanvas(20, 1)
+
+    assert.strictEqual(Object.prototype.toString.call(canvas), '[object HTMLCanvasElement]')
+  })
 
   it('CanvasGradient stringifies as [object CanvasGradient]', function () {
     const canvas = createCanvas(20, 1)
     const ctx = canvas.getContext('2d')
     const gradient = ctx.createLinearGradient(1, 1, 19, 1)
     assert.strictEqual(gradient.toString(), '[object CanvasGradient]')
+  })
+
+  it('CanvasGradient has class string of `CanvasGradient`', function () {
+    const canvas = createCanvas(20, 1)
+    const ctx = canvas.getContext('2d')
+    const gradient = ctx.createLinearGradient(1, 1, 19, 1)
+    assert.strictEqual(Object.prototype.toString.call(gradient), '[object CanvasGradient]')
   })
 
   describe('Context2d#putImageData()', function () {
@@ -1861,6 +2428,89 @@ describe('Canvas', function () {
 
     data.forEach(function (byte, index) {
       if (index + 1 & 3) { assert.strictEqual(byte, 128) } else { assert.strictEqual(byte, 255) }
+    })
+  })
+
+  describe('Context2d#save()/restore()', function () {
+    // Based on WPT meta:2d.state.saverestore
+    const state = [ // non-default values to test with
+      ['strokeStyle', '#ff0000'],
+      ['fillStyle', '#ff0000'],
+      ['globalAlpha', 0.5],
+      ['lineWidth', 0.5],
+      ['lineCap', 'round'],
+      ['lineJoin', 'round'],
+      ['miterLimit', 0.5],
+      ['shadowOffsetX', 5],
+      ['shadowOffsetY', 5],
+      ['shadowBlur', 5],
+      ['shadowColor', '#ff0000'],
+      ['globalCompositeOperation', 'copy'],
+      ['font', '25px serif'],
+      ['textAlign', 'center'],
+      ['textBaseline', 'bottom'],
+      // Added vs. WPT
+      ['imageSmoothingEnabled', false],
+      // ['imageSmoothingQuality', ], // not supported by node-canvas, #2114
+      ['lineDashOffset', 1.0],
+      // Non-standard properties:
+      ['patternQuality', 'best'],
+      // ['quality', 'best'], // doesn't do anything, TODO remove
+      ['textDrawingMode', 'glyph'],
+      ['antialias', 'gray']
+    ]
+
+    for (const [k, v] of state) {
+      it(`2d.state.saverestore.${k}`, function () {
+        const canvas = createCanvas(0, 0)
+        const ctx = canvas.getContext('2d')
+
+        // restore() undoes modification:
+        let old = ctx[k]
+        ctx.save()
+        ctx[k] = v
+        ctx.restore()
+        assert.strictEqual(ctx[k], old)
+
+        // save() doesn't modify the value:
+        ctx[k] = v
+        old = ctx[k]
+        ctx.save()
+        assert.strictEqual(ctx[k], old)
+        ctx.restore()
+      })
+    }
+  })
+
+  describe('Context2d#beingTag()/endTag()', function () {
+    before(function () {
+      const canvas = createCanvas(20, 20, 'pdf')
+      const ctx = canvas.getContext('2d')
+      if (!('beginTag' in ctx)) {
+        this.skip()
+      }
+    })
+
+    it('generates a pdf', function () {
+      const canvas = createCanvas(20, 20, 'pdf')
+      const ctx = canvas.getContext('2d')
+      ctx.beginTag('Link', "uri='http://example.com'")
+      ctx.strokeText('hello', 0, 0)
+      ctx.endTag('Link')
+      const buf = canvas.toBuffer('application/pdf')
+      assert.equal('PDF', buf.slice(1, 4).toString())
+    })
+
+    it('requires tag argument', function () {
+      const canvas = createCanvas(20, 20, 'pdf')
+      const ctx = canvas.getContext('2d')
+      assert.throws(() => { ctx.beginTag() })
+    })
+
+    it('requires attributes to be a string', function () {
+      const canvas = createCanvas(20, 20, 'pdf')
+      const ctx = canvas.getContext('2d')
+      assert.throws(() => { ctx.beginTag('Link', {}) })
     })
   })
 })
